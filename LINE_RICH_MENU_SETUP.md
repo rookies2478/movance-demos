@@ -1,7 +1,11 @@
 # LINE公式アカウント リッチメニュー設定手順
 
 対象アカウント: **Movance**（LINE Official Account ID: `@433iwomu`）
-設定方法: **LINE Official Account Manager** から手動登録（Messaging API / LIFF は使用しない）
+設定方法: 以下の2通りを記載する。
+- **A. LINE Official Account Manager から手動登録**（GUI操作のみ、追加実装なし）
+- **B. Messaging API 経由でスクリプト実行**（`scripts/setup-line-richmenu.ps1`、実行実績あり）
+
+いずれの方法でも、最終的にLINEアプリ上のリッチメニュー表示・タップ領域・遷移先URLは同一になる。LIFF / Mini App の実装は今回対象外。
 
 デモURL: https://rookies2478.github.io/movance-demos/
 
@@ -36,7 +40,9 @@ line-richmenu-2500x1686.jpg
 
 ---
 
-## 2. テンプレート／領域設定
+## A. LINE Official Account Manager から手動登録する方法
+
+### A-1. テンプレート／領域設定
 
 LINE Official Account Manager の「リッチメニュー作成」画面で以下を選択する。
 
@@ -47,7 +53,7 @@ LINE Official Account Manager の「リッチメニュー作成」画面で以�
 
 ---
 
-## 3. 左・中央・右それぞれのURL
+### A-2. 左・中央・右それぞれのURL
 
 自動生成された3つのタップ領域（左1/3・中央1/3・右1/3）に、それぞれ以下のアクション種別「URL」を設定する。
 
@@ -61,7 +67,7 @@ LINE Official Account Manager の「リッチメニュー作成」画面で以�
 
 ---
 
-## 4. 表示設定
+### A-3. 表示設定
 
 - **メニュー名**（管理用ラベル）: 任意（例：`Movance_通常メニュー`）
 - **タイトル**（トーク画面のタブ表示に使用される内部名。ユーザーには表示されない想定の項目だが必須入力）: 任意で分かりやすい名称を入力（例：`予約・アクセス・FAQ`）
@@ -72,7 +78,7 @@ LINE Official Account Manager の「リッチメニュー作成」画面で以�
 
 ---
 
-## 5. 公開後の動作確認
+### A-4. 公開後の動作確認
 
 1. Movance公式アカウント（`@433iwomu`）を友だち追加済みのスマートフォンでLINEアプリを開く
 2. トーク画面下部にリッチメニューが表示されることを確認
@@ -84,10 +90,55 @@ LINE Official Account Manager の「リッチメニュー作成」画面で以�
 
 ---
 
+## B. Messaging API 経由でスクリプト実行する方法
+
+スクリプト: `scripts/setup-line-richmenu.ps1`（PowerShell、UTF-8 with BOM保存）
+
+### B-1. スクリプトの動作内容
+
+1. リッチメニュー作成（`POST /v2/bot/richmenu`）— サイズ2500×1686、左834px/中央833px/右833px の縦フル均等3分割、各領域のaction typeは`uri`
+   - 左: `https://rookies2478.github.io/movance-demos/#course`
+   - 中央: `https://rookies2478.github.io/movance-demos/#access`
+   - 右: `https://rookies2478.github.io/movance-demos/#faq`
+2. 画像アップロード（`POST /v2/bot/richmenu/{richMenuId}/content`）— `line-richmenu-2500x1686.jpg` をアップロード
+3. デフォルトリッチメニューに設定（`POST /v2/bot/user/all/richmenu/{richMenuId}`）
+4. 疎通確認（`GET /v2/bot/info`、`GET /v2/bot/richmenu/{richMenuId}`、`GET /v2/bot/user/all/richmenu`）
+
+### B-2. Channel Access Tokenの取扱い
+
+- 環境変数 `LINE_CHANNEL_ACCESS_TOKEN` が設定されていればそれを使用する
+- 未設定の場合は実行時に `Read-Host -AsSecureString` で対話入力させる（画面には表示されない）
+- トークンはファイル保存・ログ出力・Gitへのコミットを一切行わない。API呼び出し中のみメモリ上で使用し、処理終了後に変数参照を破棄する（PowerShellの文字列は不変のため完全消去の保証はできないが、可能な範囲で対応）
+
+### B-3. 実行コマンド
+
+対話環境（起動元PowerShell）で実行する。`Read-Host` を使うため、非対話シェル（CI等）では環境変数を必ず設定してから実行すること。
+
+```powershell
+powershell -File "scripts\setup-line-richmenu.ps1"
+```
+
+### B-4. 実行実績
+
+2026年9月7日、Movanceアカウントに対して本スクリプトを実行し、以下の結果で成功を確認済み。
+
+| 項目 | 結果 |
+|---|---|
+| displayName | Movance |
+| richMenuId | `richmenu-afbf20d917fce24218c69db78d81503e` |
+| 画像アップロード | success |
+| デフォルト設定 | success |
+| デフォルト確認 | match |
+| size | 2500×1686 |
+| areas | 3 |
+
+※ `richMenuId` は実行のたびに新規発行される。上記は実行時点の記録であり、再実行時は異なるIDになる。
+
+---
+
 ## 対象外（今回は実施しない）
 
-- LINE Developers コンソールでの設定
-- Messaging API によるリッチメニューの自動作成・切り替え
+- LINE Developers コンソールでの設定（チャネル自体の作成・設定変更）
 - LIFF / Mini App の実装
 
 これらは将来的に自動化・パーソナライズ（例：ユーザー属性別のリッチメニュー出し分け）が必要になった場合に別途検討する。
